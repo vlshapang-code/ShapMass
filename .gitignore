@@ -237,3 +237,6 @@ Community Context/
 # Rust build output
 mac/rust/target/
 windows/rust/target/
+
+# Local Python install (Python Install Manager runtime), not project code
+/Python/
