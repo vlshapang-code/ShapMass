@@ -5,6 +5,8 @@ All plots:
     two-finger scroll           pan
     double-click                reset zoom to fit the data
     click-hold on an axis       drag up = zoom in on that axis, drag down = zoom out
+    hover on the Y axis         up arrow = zoom in, down arrow = zoom out
+    hover on the X axis         right arrow = zoom in, left arrow = zoom out
     right-click                 pyqtgraph's menu (export, etc.)
 
 Spectrum plots:
@@ -16,6 +18,7 @@ Chromatogram plot:
     (shift is True when the Shift key was held.)
 """
 from PySide6.QtCore import QEvent, Qt, Signal
+from PySide6.QtGui import QCursor
 
 import pyqtgraph as pg
 
@@ -26,6 +29,9 @@ SELECTION_COLOR = (80, 140, 255)
 # How fast dragging on an axis zooms: each pixel of drag scales by this factor.
 # 1.01 ** 70 ≈ 2, so a 70-pixel drag doubles/halves the zoom.
 AXIS_ZOOM_PER_PIXEL = 1.01
+
+# Each arrow-key press zooms an axis in or out by this factor (holding the key repeats it).
+ARROW_ZOOM_STEP = 1.15
 
 # A normal mouse wheel reports angles, not pixels. Pixels to pan per wheel notch.
 WHEEL_NOTCH_PIXELS = 30
@@ -49,12 +55,17 @@ class ZoomAxis(pg.AxisItem):
         dy = ev.screenPos().y() - ev.lastScreenPos().y()
         factor = AXIS_ZOOM_PER_PIXEL ** dy
 
+        self.zoom(factor, self._anchor)
+
+    def zoom(self, factor, anchor):
+        """Scale this axis by factor (< 1 zooms in) around the data point anchor."""
+        view = self.linkedView()
         if self.orientation in ("bottom", "top"):
-            view.scaleBy(x=factor, center=self._anchor)
+            view.scaleBy(x=factor, center=anchor)
         else:
             # Intensity axis: keep the bottom edge fixed so the baseline stays put.
             bottom = view.viewRange()[1][0]
-            view.scaleBy(y=factor, center=pg.Point(self._anchor.x(), bottom))
+            view.scaleBy(y=factor, center=pg.Point(anchor.x(), bottom))
 
     def wheelEvent(self, ev):
         ev.ignore()  # Axis zoom is drag-only; don't let scrolling over an axis zoom it.
@@ -161,6 +172,45 @@ class TrackpadPlotWidget(pg.PlotWidget):
     def mousePressEvent(self, ev):
         self.sigPressed.emit()
         super().mousePressEvent(ev)
+
+    def enterEvent(self, ev):
+        # Take keyboard focus on hover so arrow keys work without clicking first.
+        self.setFocus(Qt.FocusReason.MouseFocusReason)
+        super().enterEvent(ev)
+
+    def _axis_under_cursor(self):
+        """The axis the mouse is hovering over, or None.
+
+        Uses the axis's layout geometry rather than its bounding rect, which is
+        stretched across the whole plot by the grid lines.
+        """
+        scene_pos = self.mapToScene(self.viewport().mapFromGlobal(QCursor.pos()))
+        for name in ("bottom", "left"):
+            axis = self.getPlotItem().getAxis(name)
+            if axis.isVisible() and axis.parentItem().mapRectToScene(axis.geometry()).contains(scene_pos):
+                return axis, scene_pos
+        return None, scene_pos
+
+    def keyPressEvent(self, ev):
+        """Arrow keys zoom the axis under the mouse.
+
+        Y axis:  up = zoom in, down = zoom out  (same direction as dragging)
+        X axis:  right = zoom in, left = zoom out
+        """
+        axis, scene_pos = self._axis_under_cursor()
+        key = ev.key()
+        if axis is not None:
+            vertical = axis.orientation in ("left", "right")
+            zoom_in = {True: Qt.Key.Key_Up, False: Qt.Key.Key_Right}[vertical]
+            zoom_out = {True: Qt.Key.Key_Down, False: Qt.Key.Key_Left}[vertical]
+            if key in (zoom_in, zoom_out):
+                factor = 1 / ARROW_ZOOM_STEP if key == zoom_in else ARROW_ZOOM_STEP
+                # Zoom around the data value under the mouse along that axis.
+                anchor = self.getViewBox().mapSceneToView(scene_pos)
+                axis.zoom(factor, anchor)
+                ev.accept()
+                return
+        super().keyPressEvent(ev)
 
     def viewportEvent(self, event):
         # macOS trackpad pinches arrive as "native gestures", not wheel events.
