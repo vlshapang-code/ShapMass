@@ -28,6 +28,7 @@ sys.path.append(str(_THERMO_LIB))
 clr.AddReference("ThermoFisher.CommonCore.Data")
 clr.AddReference("ThermoFisher.CommonCore.RawFileReader")
 
+from ThermoFisher.CommonCore.Data import Extensions  # noqa: E402
 from ThermoFisher.CommonCore.Data.Business import (  # noqa: E402
     ChromatogramSignal,
     ChromatogramTraceSettings,
@@ -35,6 +36,11 @@ from ThermoFisher.CommonCore.Data.Business import (  # noqa: E402
     TraceType,
 )
 from ThermoFisher.CommonCore.RawFileReader import RawFileReaderAdapter  # noqa: E402
+
+
+def _to_numpy(net_array):
+    """Copy a .NET double[] into a numpy array."""
+    return np.array(list(net_array), dtype=float)
 
 
 class RawFile:
@@ -67,6 +73,38 @@ class RawFile:
             np.array(list(signal.Intensities), dtype=float),
             np.array(list(signal.Scans), dtype=int),
         )
+
+    def scan_number_at(self, retention_time):
+        """Scan number closest to a retention time (minutes)."""
+        return int(self._raw.ScanNumberFromRetentionTime(retention_time))
+
+    def retention_time(self, scan):
+        return float(self._raw.RetentionTimeFromScanNumber(scan))
+
+    def scan_type(self, scan):
+        """Thermo's scan description, e.g. 'FTMS + p ESI sid=20.00 Full ms [700.0000-3000.0000]'."""
+        return str(self._raw.GetScanEventStringForScanNumber(scan))
+
+    def spectrum(self, scan):
+        """One scan as (mz, intensity) numpy arrays (profile points if recorded in profile)."""
+        segmented = self._raw.GetSegmentedScanFromScanNumber(scan, None)
+        return _to_numpy(segmented.Positions), _to_numpy(segmented.Intensities)
+
+    def average(self, first_scan, last_scan):
+        """Average scans first_scan..last_scan, using Thermo's own averaging.
+
+        Only scans with the same scan type as first_scan are included, so
+        methods that alternate scan types (e.g. 3-phase in-source CID) aren't mixed.
+        Returns (mz, intensity) numpy arrays.
+        """
+        scan_filter = self._raw.GetFilterForScanNumber(first_scan)
+        averaged = Extensions.AverageScansInScanRange(
+            self._raw, first_scan, last_scan, scan_filter, None, None
+        )
+        if averaged is None:
+            raise ValueError(f"No scans to average between {first_scan} and {last_scan}")
+        segmented = averaged.SegmentedScan
+        return _to_numpy(segmented.Positions), _to_numpy(segmented.Intensities)
 
     def close(self):
         self._raw.Dispose()
