@@ -218,3 +218,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---- ShapMass-specific ----
+# macOS
+.DS_Store
+
+# Thermo RawFileReader DLLs: licensed by Thermo, must not be redistributed.
+# See vendor/thermo/License.txt. Re-download from
+# https://github.com/thermofisherlsms/RawFileReader (Libs/NetCore/Net8).
+vendor/thermo/
+
+# Instrument data and reference papers: large and/or not ours to share.
+Raw Files/
+Community Context/
+*.raw
+*.meth
