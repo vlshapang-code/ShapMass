@@ -13,7 +13,7 @@ All plots:
 Spectrum plots (SpectrumViewBox):
     click                       zoom in on m/z around the click, intensity fits what is visible
     double-click                zoom out one step (back to the full view once fully out)
-    click-hold / drag           does nothing (the spectrum never moves by accident)
+    click-drag                  zoom to the m/z range you drag across (the spectrum never pans)
 
 Chromatogram plot:
     click                       pick a single scan        -> sigClicked(rt, shift)
@@ -120,15 +120,38 @@ class TrackpadViewBox(pg.ViewBox):
 
 
 class SpectrumViewBox(TrackpadViewBox):
-    """Spectrum plot area: click to zoom in, double-click to zoom out, no drag-panning."""
+    """Spectrum plot area: click to zoom in, drag to zoom to a range, double-click to zoom out.
+
+    Dragging never pans the spectrum.
+    """
 
     def __init__(self):
         super().__init__()
         # When the intensity axis auto-fits, consider only data inside the current m/z view.
         self.setAutoVisible(y=True)
+        # Shaded band shown while dragging out a range to zoom to.
+        self.zoom_band = pg.LinearRegionItem(
+            movable=False, brush=SELECTION_COLOR + (60,), pen=pg.mkPen(SELECTION_COLOR)
+        )
+        self.zoom_band.hide()
+        self.addItem(self.zoom_band, ignoreBounds=True)
 
     def mouseDragEvent(self, ev, axis=None):
-        ev.accept()  # swallow it: holding or dragging must not move the spectrum
+        if ev.button() != LEFT:
+            ev.ignore()
+            return
+        ev.accept()
+        start = self.mapSceneToView(ev.buttonDownScenePos()).x()
+        end = self.mapSceneToView(ev.scenePos()).x()
+        lo, hi = sorted((start, end))
+        if not ev.isFinish():
+            self.zoom_band.setRegion((lo, hi))
+            self.zoom_band.show()
+            return
+        self.zoom_band.hide()
+        if hi - lo > 4 * self.viewPixelSize()[0]:  # ignore accidental tiny drags
+            self.setXRange(lo, hi, padding=0)
+            self.enableAutoRange(axis=pg.ViewBox.YAxis)
 
     def mouseClickEvent(self, ev):
         if ev.button() != LEFT:
