@@ -1,4 +1,4 @@
-//! Read Thermo .raw files. Rust twin of `shapmass/raw_reader.py`.
+//! Read Thermo .raw files. Rust twin of `python/raw_reader.py`.
 //!
 //! Uses the `thermorawfilereader` crate, which hosts Thermo's own RawFileReader
 //! in .NET 8, just like the Python version does through pythonnet.

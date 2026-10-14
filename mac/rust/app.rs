@@ -1,4 +1,4 @@
-//! The main window. Rust twin of `shapmass/main_window.py` + `spectrum_dock.py`.
+//! The main window. Rust twin of `python/main_window.py` + `spectrum_dock.py`.
 //!
 //! Layout:
 //!     - Top:    the TIC.

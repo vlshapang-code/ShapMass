@@ -3,14 +3,11 @@
 Run from the repo root with:  .venv\\Scripts\\python windows\\main.py
 """
 import sys
-from pathlib import Path
 
-# The shapmass package lives in python\ next to this file.
-sys.path.insert(0, str(Path(__file__).resolve().parent / "python"))
+from PySide6.QtWidgets import QApplication
 
-from PySide6.QtWidgets import QApplication  # noqa: E402
-
-from shapmass.main_window import MainWindow  # noqa: E402
+# The app's modules live in python\ next to this file.
+from python.main_window import MainWindow
 
 
 def main():

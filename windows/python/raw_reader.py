@@ -5,10 +5,10 @@ plain Python numbers and numpy arrays, so the GUI never needs to know about
 pythonnet or Thermo's API.
 
 Requirements (see vendor/thermo/ and .gitignore for where these come from):
-    - .NET 8 runtime in ~/.dotnet (or set DOTNET_ROOT)
+    - .NET 8 runtime, normally installed system-wide in C:\\Program Files\\dotnet
+      (set DOTNET_ROOT to use a different install)
     - Thermo DLLs in vendor/thermo/lib
 """
-import os
 import sys
 from pathlib import Path
 
@@ -16,9 +16,8 @@ import numpy as np
 from pythonnet import load
 
 # --- Start the .NET runtime and load Thermo's DLLs (runs once, on import) ---
-# pythonnet locates the runtime via the DOTNET_ROOT environment variable.
-os.environ.setdefault("DOTNET_ROOT", str(Path.home() / ".dotnet"))
-_THERMO_LIB = Path(__file__).resolve().parents[3] / "vendor" / "thermo" / "lib"
+# pythonnet finds the system-wide .NET install on its own, or uses DOTNET_ROOT if set.
+_THERMO_LIB = Path(__file__).resolve().parents[2] / "vendor" / "thermo" / "lib"
 
 load("coreclr")
 

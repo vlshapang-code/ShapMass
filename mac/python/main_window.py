@@ -25,9 +25,9 @@ from PySide6.QtWidgets import QFileDialog, QMainWindow, QMessageBox
 
 import pyqtgraph as pg
 
-from shapmass.plot_widgets import ChromatogramViewBox, TrackpadPlotWidget
-from shapmass.raw_reader import RawFile
-from shapmass.spectrum_dock import SpectrumDock
+from .plot_widgets import ChromatogramViewBox, TrackpadPlotWidget
+from .raw_reader import RawFile
+from .spectrum_dock import SpectrumDock
 
 # White background / black axes, like most mass spec software.
 pg.setConfigOptions(background="w", foreground="k", antialias=False)

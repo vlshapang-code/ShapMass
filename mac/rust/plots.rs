@@ -1,4 +1,4 @@
-//! Plot behaviour shared by the TIC and spectra. Rust twin of `shapmass/plot_widgets.py`.
+//! Plot behaviour shared by the TIC and spectra. Rust twin of `python/plot_widgets.py`.
 //!
 //! All plots:
 //!     pinch                       zoom in/out around the cursor        (egui_plot built-in)

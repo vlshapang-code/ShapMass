@@ -8,7 +8,7 @@ mac/        macOS version
 windows/    Windows version (Windows-specific input, menus and paths)
             Both have the same layout:
   main.py, main.rs     entry points
-  python/              shapmass/ package, requirements.txt
+  python/              the other .py files, requirements.txt
   rust/                the other .rs files, Cargo.toml (Windows also has build.rs)
 vendor/thermo/lib/   Thermo RawFileReader .NET 8 DLLs (not in the repo, shared by both)
 vendor/nethost/      libnethost.lib for the Windows Rust build (MIT, from NuGet)

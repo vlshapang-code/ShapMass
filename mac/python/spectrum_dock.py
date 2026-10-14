@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QDockWidget
 
 import pyqtgraph as pg
 
-from shapmass.plot_widgets import SpectrumViewBox, TrackpadPlotWidget
+from .plot_widgets import SpectrumViewBox, TrackpadPlotWidget
 
 # Title bar highlight for the active window (the one plain TIC clicks update).
 ACTIVE_STYLE = "QDockWidget::title { background: rgb(190, 210, 255); }"

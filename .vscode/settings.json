@@ -1,8 +1,6 @@
 {
     // The Rust projects live in mac/rust/ and windows/rust/, not the repo root.
     "rust-analyzer.linkedProjects": ["mac/rust/Cargo.toml", "windows/rust/Cargo.toml"],
-    // main.py adds python/ to the import path at runtime; tell Pylance too.
-    "python.analysis.extraPaths": ["mac/python", "windows/python"],
     // Debug builds of the GUI are very slow; make the Run link build with --release.
     "rust-analyzer.runnables.extraArgs": ["--release"],
 
