@@ -5,6 +5,8 @@
 //!     cargo run --release -- "../Raw Files/some_file.raw"     (open a file right away)
 
 mod app;
+#[cfg(target_os = "macos")]
+mod native_menu;
 mod plots;
 mod raw_reader;
 

@@ -22,6 +22,8 @@ use eframe::egui::{self, Color32, Key, KeyboardShortcut, Modifiers, RichText, Wi
 use egui_dock::tab_viewer::OnCloseResponse;
 use egui_dock::{DockArea, DockState, Node, NodeIndex, Style, TabViewer, Tree};
 
+#[cfg(target_os = "macos")]
+use crate::native_menu::{MenuAction, NativeMenu};
 use crate::plots::{self, Kind, Marker, PlotState};
 use crate::raw_reader::RawFile;
 
@@ -61,12 +63,19 @@ pub struct ShapMassApp {
     next_id: usize,
     /// Result of the Open dialog, which runs on its own thread (see `start_open_dialog`).
     open_dialog: Option<Receiver<Option<PathBuf>>>,
+    /// The real macOS menu bar. If it can't be installed, the in-window menu is used.
+    #[cfg(target_os = "macos")]
+    native_menu: Option<NativeMenu>,
 }
 
 impl ShapMassApp {
     pub fn new(cc: &eframe::CreationContext<'_>, open: Option<PathBuf>) -> Self {
         cc.egui_ctx.set_visuals(egui::Visuals::light()); // white, like the Python app
         let mut app = Self::empty();
+        #[cfg(target_os = "macos")]
+        {
+            app.native_menu = NativeMenu::install(&cc.egui_ctx);
+        }
         if let Some(path) = open {
             app.open_file(&path);
         }
@@ -86,6 +95,8 @@ impl ShapMassApp {
             active: None,
             next_id: 1,
             open_dialog: None,
+            #[cfg(target_os = "macos")]
+            native_menu: None,
         }
     }
 
@@ -250,6 +261,35 @@ impl ShapMassApp {
         }
     }
 
+    fn has_native_menu(&self) -> bool {
+        #[cfg(target_os = "macos")]
+        {
+            self.native_menu.is_some()
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            false
+        }
+    }
+
+    /// Handle clicks and shortcuts from the macOS menu bar.
+    fn poll_native_menu(&mut self, ctx: &egui::Context) {
+        #[cfg(target_os = "macos")]
+        {
+            let actions = self.native_menu.as_ref().map(|m| m.poll()).unwrap_or_default();
+            for action in actions {
+                match action {
+                    MenuAction::Open => self.start_open_dialog(ctx),
+                    MenuAction::NewWindow => {
+                        self.new_window();
+                    }
+                }
+            }
+        }
+        #[cfg(not(target_os = "macos"))]
+        let _ = ctx;
+    }
+
     /// Show the macOS file picker without blocking the draw loop.
     ///
     /// A blocking dialog opened from inside a frame re-enters the window
@@ -320,9 +360,12 @@ impl eframe::App for ShapMassApp {
         let title = if self.file_name.is_empty() { "ShapMass (Rust)".into() } else { format!("ShapMass (Rust) — {}", self.file_name) };
         ui.ctx().send_viewport_cmd(egui::ViewportCommand::Title(title));
 
+        self.poll_native_menu(&ui.ctx().clone());
         self.poll_open_dialog(&ui.ctx().clone());
 
-        egui::Panel::top("menu").show(ui, |ui| self.menu_bar(ui));
+        if !self.has_native_menu() {
+            egui::Panel::top("menu").show(ui, |ui| self.menu_bar(ui));
+        }
         egui::Panel::bottom("status").show(ui, |ui| ui.label(&self.status));
 
         if self.windows.is_empty() {
