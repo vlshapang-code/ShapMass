@@ -1,0 +1,6 @@
+{
+    // The Rust project lives in rust/, not the repo root.
+    "rust-analyzer.linkedProjects": ["rust/Cargo.toml"],
+    // Debug builds of the GUI are very slow; make the Run link build with --release.
+    "rust-analyzer.runnables.extraArgs": ["--release"]
+}
