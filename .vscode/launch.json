@@ -1,41 +1,79 @@
 {
-    // Pick one in the Run and Debug panel (Cmd+Shift+D), then press the green play button or F5.
+    // Pick one in the Run and Debug panel (Cmd/Ctrl+Shift+D), then press the green play button or F5.
     // "release" starts fast; "debug" is slow (the GUI library is unoptimised) but steps best.
+    // Mac configs use CodeLLDB; Windows Rust configs use the C/C++ extension's debugger (cppvsdbg).
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "ShapMass (Rust) — run",
+            "name": "Mac: ShapMass (Rust) — run",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/rust/target/release/shapmass-rs",
+            "program": "${workspaceFolder}/mac/rust/target/release/shapmass-rs",
             "args": [],
-            "cwd": "${workspaceFolder}/rust",
-            "preLaunchTask": "cargo build (release)"
+            "cwd": "${workspaceFolder}/mac/rust",
+            "preLaunchTask": "Mac: cargo build (release)"
         },
         {
-            "name": "ShapMass (Rust) — run with NISTmAB file",
+            "name": "Mac: ShapMass (Rust) — run with NISTmAB file",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/rust/target/release/shapmass-rs",
+            "program": "${workspaceFolder}/mac/rust/target/release/shapmass-rs",
             "args": ["${workspaceFolder}/Raw Files/NISTmAB_QE_C_3_phase_200ng_on_column_1.raw"],
-            "cwd": "${workspaceFolder}/rust",
-            "preLaunchTask": "cargo build (release)"
+            "cwd": "${workspaceFolder}/mac/rust",
+            "preLaunchTask": "Mac: cargo build (release)"
         },
         {
-            "name": "ShapMass (Rust) — debug build",
+            "name": "Mac: ShapMass (Rust) — debug build",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/rust/target/debug/shapmass-rs",
+            "program": "${workspaceFolder}/mac/rust/target/debug/shapmass-rs",
             "args": [],
-            "cwd": "${workspaceFolder}/rust",
-            "preLaunchTask": "cargo build (debug)"
+            "cwd": "${workspaceFolder}/mac/rust",
+            "preLaunchTask": "Mac: cargo build (debug)"
         },
         {
-            "name": "ShapMass (Python)",
+            "name": "Mac: ShapMass (Python)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/main.py",
+            "program": "${workspaceFolder}/mac/main.py",
             "python": "${workspaceFolder}/.venv/bin/python",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Windows: ShapMass (Rust) — run",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/windows/rust/target/release/shapmass-rs.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/windows/rust",
+            "preLaunchTask": "Windows: cargo build (release)"
+        },
+        {
+            "name": "Windows: ShapMass (Rust) — run with NISTmAB file",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/windows/rust/target/release/shapmass-rs.exe",
+            "args": ["${workspaceFolder}/Raw Files/NISTmAB_QE_C_3_phase_200ng_on_column_1.raw"],
+            "cwd": "${workspaceFolder}/windows/rust",
+            "preLaunchTask": "Windows: cargo build (release)"
+        },
+        {
+            "name": "Windows: ShapMass (Rust) — debug build",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/windows/rust/target/debug/shapmass-rs.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/windows/rust",
+            "console": "integratedTerminal",
+            "preLaunchTask": "Windows: cargo build (debug)"
+        },
+        {
+            "name": "Windows: ShapMass (Python)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/windows/main.py",
+            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
         }

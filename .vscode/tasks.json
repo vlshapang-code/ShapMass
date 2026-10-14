@@ -3,28 +3,52 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "cargo build (release)",
+            "label": "Mac: cargo build (release)",
             "type": "shell",
             "command": "${userHome}/.cargo/bin/cargo",
-            "args": ["build", "--release", "--manifest-path", "${workspaceFolder}/rust/Cargo.toml"],
+            "args": ["build", "--release", "--manifest-path", "${workspaceFolder}/mac/rust/Cargo.toml"],
             "problemMatcher": "$rustc",
             "group": "build"
         },
         {
-            "label": "cargo build (debug)",
+            "label": "Mac: cargo build (debug)",
             "type": "shell",
             "command": "${userHome}/.cargo/bin/cargo",
-            "args": ["build", "--manifest-path", "${workspaceFolder}/rust/Cargo.toml"],
+            "args": ["build", "--manifest-path", "${workspaceFolder}/mac/rust/Cargo.toml"],
             "problemMatcher": "$rustc",
             "group": "build"
         },
         {
-            "label": "ShapMass (Rust): run",
+            "label": "Mac: ShapMass (Rust): run",
             "type": "shell",
             "command": "${userHome}/.cargo/bin/cargo",
-            "args": ["run", "--release", "--manifest-path", "${workspaceFolder}/rust/Cargo.toml"],
+            "args": ["run", "--release", "--manifest-path", "${workspaceFolder}/mac/rust/Cargo.toml"],
             "problemMatcher": "$rustc",
-            "group": { "kind": "test", "isDefault": true }
+            "group": "test"
+        },
+        {
+            "label": "Windows: cargo build (release)",
+            "type": "process",
+            "command": "${userHome}\\.cargo\\bin\\cargo.exe",
+            "args": ["build", "--release", "--manifest-path", "${workspaceFolder}\\windows\\rust\\Cargo.toml"],
+            "problemMatcher": "$rustc",
+            "group": "build"
+        },
+        {
+            "label": "Windows: cargo build (debug)",
+            "type": "process",
+            "command": "${userHome}\\.cargo\\bin\\cargo.exe",
+            "args": ["build", "--manifest-path", "${workspaceFolder}\\windows\\rust\\Cargo.toml"],
+            "problemMatcher": "$rustc",
+            "group": "build"
+        },
+        {
+            "label": "Windows: ShapMass (Rust): run",
+            "type": "process",
+            "command": "${userHome}\\.cargo\\bin\\cargo.exe",
+            "args": ["run", "--release", "--manifest-path", "${workspaceFolder}\\windows\\rust\\Cargo.toml"],
+            "problemMatcher": "$rustc",
+            "group": "test"
         }
     ]
 }

@@ -486,7 +486,7 @@ mod tests {
     #[test]
     fn window_routing_matches_python() {
         let mut app = ShapMassApp::empty();
-        app.open_file(Path::new("../Raw Files/NISTmAB_QE_C_3_phase_200ng_on_column_1.raw"));
+        app.open_file(Path::new("../../Raw Files/NISTmAB_QE_C_3_phase_200ng_on_column_1.raw"));
         assert!(app.windows.is_empty(), "only the TIC after opening");
 
         app.show_scan_at(7.5, false);

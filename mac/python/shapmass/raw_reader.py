@@ -18,7 +18,7 @@ from pythonnet import load
 # --- Start the .NET runtime and load Thermo's DLLs (runs once, on import) ---
 # pythonnet locates the runtime via the DOTNET_ROOT environment variable.
 os.environ.setdefault("DOTNET_ROOT", str(Path.home() / ".dotnet"))
-_THERMO_LIB = Path(__file__).resolve().parent.parent / "vendor" / "thermo" / "lib"
+_THERMO_LIB = Path(__file__).resolve().parents[3] / "vendor" / "thermo" / "lib"
 
 load("coreclr")
 

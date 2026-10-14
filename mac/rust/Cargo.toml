@@ -3,6 +3,10 @@ name = "shapmass-rs"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "shapmass-rs"
+path = "../main.rs"
+
 [dependencies]
 eframe = "0.36.2"
 egui_dock = "0.21.1"

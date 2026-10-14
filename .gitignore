@@ -235,4 +235,5 @@ Community Context/
 *.meth
 
 # Rust build output
-rust/target/
+mac/rust/target/
+windows/rust/target/

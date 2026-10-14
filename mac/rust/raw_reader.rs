@@ -179,7 +179,7 @@ fn add_interpolated(grid: &[f64], mz: &[f64], intensity: &[f64], sum: &mut [f64]
 mod tests {
     use super::*;
 
-    const NIST: &str = "../Raw Files/NISTmAB_QE_C_3_phase_200ng_on_column_1.raw";
+    const NIST: &str = "../../Raw Files/NISTmAB_QE_C_3_phase_200ng_on_column_1.raw";
 
     #[test]
     fn reads_the_nist_file_like_python() {
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn opens_every_raw_file_in_the_data_folder() {
-        let Ok(dir) = std::fs::read_dir("../Raw Files") else { return };
+        let Ok(dir) = std::fs::read_dir("../../Raw Files") else { return };
         let mut failures = Vec::new();
         for entry in dir.flatten() {
             let path = entry.path();

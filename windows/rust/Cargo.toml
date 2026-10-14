@@ -1,0 +1,17 @@
+[package]
+name = "shapmass-rs"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "shapmass-rs"
+path = "../main.rs"
+
+[dependencies]
+eframe = "0.36.2"
+egui_dock = "0.21.1"
+egui_plot = "0.37.0"
+rfd = "0.17.2"
+# No "nethost-download": it fetches libnethost at build time and needs a C compiler.
+# libnethost.lib comes from vendor\nethost instead (see build.rs).
+thermorawfilereader = { version = "0.8.0", default-features = false, features = ["net8_0"] }

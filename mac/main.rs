@@ -1,13 +1,17 @@
 //! Launch ShapMass (Rust). Rust twin of `main.py`.
 //!
-//! Run from the rust/ folder:
+//! The rest of the Rust code and Cargo.toml are in rust/. Run from the mac/rust/ folder:
 //!     cargo run --release
-//!     cargo run --release -- "../Raw Files/some_file.raw"     (open a file right away)
+//!     cargo run --release -- "../../Raw Files/some_file.raw"     (open a file right away)
 
+#[path = "rust/app.rs"]
 mod app;
 #[cfg(target_os = "macos")]
+#[path = "rust/native_menu.rs"]
 mod native_menu;
+#[path = "rust/plots.rs"]
 mod plots;
+#[path = "rust/raw_reader.rs"]
 mod raw_reader;
 
 use std::path::PathBuf;
