@@ -4,6 +4,14 @@
     // Debug builds of the GUI are very slow; make the Run link build with --release.
     "rust-analyzer.runnables.extraArgs": ["--release"],
 
+    // Python: use the project's .venv. On Windows it is a conda env (python.exe sits in .venv\,
+    // not .venv\Scripts\), which VS Code doesn't auto-detect; the Mac pip venv is found as usual.
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/python.exe",
+    // New Windows terminals (and so the Code Runner ▷ button) get .venv first on PATH, so plain `python` is the venv.
+    "terminal.integrated.env.windows": {
+        "PATH": "${workspaceFolder}\\.venv;${workspaceFolder}\\.venv\\Scripts;${env:PATH}"
+    },
+
     // Code Runner: the ▷ button in the top-right of the editor. For Rust it runs the
     // whole app the open file belongs to (from main.rs it steps into rust/ to find Cargo.toml).
     // This command is written for the Mac shell; on Windows use the "Windows:" tasks instead.

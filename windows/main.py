@@ -1,6 +1,6 @@
 """Launch ShapMass.
 
-Run from the repo root with:  .venv\\Scripts\\python windows\\main.py
+Run from the repo root with:  .venv\\python.exe windows\\main.py
 """
 import sys
 

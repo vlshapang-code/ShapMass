@@ -73,7 +73,7 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/windows/main.py",
-            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "python": "${workspaceFolder}/.venv/python.exe",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal"
         }

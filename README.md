@@ -30,9 +30,18 @@ cd mac/rust && cargo run --release
 Windows (from the repo root):
 
 ```
-.venv\Scripts\python windows\main.py
+.venv\python.exe windows\main.py
 cd windows\rust; cargo run --release
 ```
+
+On a PC where PyPI downloads are blocked, build `.venv` from conda-forge instead of pip
+(micromamba is a single .exe from https://github.com/mamba-org/micromamba-releases):
+
+```
+micromamba create -y -p ./.venv -c conda-forge --override-channels python=3.12 pyside6 pyqtgraph numpy pythonnet
+```
+
+This `.venv` is a conda environment, so its Python is `.venv\python.exe`, not `.venv\Scripts\python.exe`.
 
 The Windows Rust build doesn't need Visual Studio. `windows\rust\Cargo.toml` turns off
 thermorawfilereader's `nethost-download` feature (it needs a C compiler) and `build.rs` links
