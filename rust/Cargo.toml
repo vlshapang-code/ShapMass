@@ -1,0 +1,11 @@
+[package]
+name = "shapmass-rs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+eframe = "0.36.2"
+egui_dock = "0.21.1"
+egui_plot = "0.37.0"
+rfd = "0.17.2"
+thermorawfilereader = "0.8.0"

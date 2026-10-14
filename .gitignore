@@ -233,3 +233,6 @@ Raw Files/
 Community Context/
 *.raw
 *.meth
+
+# Rust build output
+rust/target/
