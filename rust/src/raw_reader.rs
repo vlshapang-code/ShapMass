@@ -202,4 +202,25 @@ mod tests {
                  intensity.iter().cloned().fold(0.0, f64::max), t.elapsed());
         assert!(mz.len() > 1000);
     }
+
+    #[test]
+    fn opens_every_raw_file_in_the_data_folder() {
+        let Ok(dir) = std::fs::read_dir("../Raw Files") else { return };
+        let mut failures = Vec::new();
+        for entry in dir.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|e| e == "raw") {
+                let t = std::time::Instant::now();
+                match RawFile::open(&path) {
+                    Ok(raw) => println!("ok   {:>5} scans  {:>5.1}s  {}", raw.last_scan, t.elapsed().as_secs_f32(),
+                                        path.file_name().unwrap().to_string_lossy()),
+                    Err(e) => {
+                        println!("FAIL {e}  {}", path.display());
+                        failures.push(path);
+                    }
+                }
+            }
+        }
+        assert!(failures.is_empty(), "{} files failed to open", failures.len());
+    }
 }

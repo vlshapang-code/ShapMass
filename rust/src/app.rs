@@ -16,6 +16,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::{self, Receiver};
 
 use eframe::egui::{self, Color32, Key, KeyboardShortcut, Modifiers, RichText, WidgetText};
 use egui_dock::tab_viewer::OnCloseResponse;
@@ -58,6 +59,8 @@ pub struct ShapMassApp {
     order: Vec<usize>,      // open window ids, oldest first
     active: Option<usize>,
     next_id: usize,
+    /// Result of the Open dialog, which runs on its own thread (see `start_open_dialog`).
+    open_dialog: Option<Receiver<Option<PathBuf>>>,
 }
 
 impl ShapMassApp {
@@ -74,7 +77,7 @@ impl ShapMassApp {
         Self {
             raw: None,
             file_name: String::new(),
-            status: "File → Open… to load a Thermo .raw file".into(),
+            status: "File → Open… (or drop a .raw file on the window) to load a Thermo .raw file".into(),
             tic: (Vec::new(), Vec::new()),
             tic_plot: PlotState::default(),
             windows: HashMap::new(),
@@ -82,6 +85,7 @@ impl ShapMassApp {
             order: Vec::new(),
             active: None,
             next_id: 1,
+            open_dialog: None,
         }
     }
 
@@ -235,16 +239,56 @@ impl ShapMassApp {
             });
         });
 
-        if do_open
-            && let Some(path) = rfd::FileDialog::new().add_filter("Thermo RAW files", &["raw"]).pick_file()
-        {
-            self.open_file(&path);
+        if do_open {
+            self.start_open_dialog(ui.ctx());
         }
         if do_new {
             self.new_window();
         }
         if do_quit {
             ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+    }
+
+    /// Show the macOS file picker without blocking the draw loop.
+    ///
+    /// A blocking dialog opened from inside a frame re-enters the window
+    /// system's event handler, which is unreliable on macOS. Instead the dialog
+    /// runs from a helper thread (rfd hops to the main thread itself) and the
+    /// chosen path is picked up on a later frame by `poll_open_dialog`.
+    fn start_open_dialog(&mut self, ctx: &egui::Context) {
+        if self.open_dialog.is_some() {
+            return; // already open
+        }
+        let (tx, rx) = mpsc::channel();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let picked = rfd::FileDialog::new()
+                .add_filter("Thermo RAW files", &["raw"])
+                .set_title("Open Thermo RAW file")
+                .pick_file();
+            let _ = tx.send(picked);
+            ctx.request_repaint(); // wake the UI so it sees the result
+        });
+        self.open_dialog = Some(rx);
+        self.status = "Choose a .raw file…".into();
+    }
+
+    /// Open a file picked in the dialog, or dropped onto the window.
+    fn poll_open_dialog(&mut self, ctx: &egui::Context) {
+        if let Some(rx) = &self.open_dialog
+            && let Ok(picked) = rx.try_recv()
+        {
+            self.open_dialog = None;
+            match picked {
+                Some(path) => self.open_file(&path),
+                None => self.status = "Open cancelled".into(),
+            }
+        }
+        // Drag-and-drop: drop a .raw file anywhere on the window.
+        let dropped = ctx.input(|i| i.raw.dropped_files.iter().find_map(|f| Some(f.path().to_path_buf())));
+        if let Some(path) = dropped {
+            self.open_file(&path);
         }
     }
 
@@ -275,6 +319,8 @@ impl eframe::App for ShapMassApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let title = if self.file_name.is_empty() { "ShapMass (Rust)".into() } else { format!("ShapMass (Rust) — {}", self.file_name) };
         ui.ctx().send_viewport_cmd(egui::ViewportCommand::Title(title));
+
+        self.poll_open_dialog(&ui.ctx().clone());
 
         egui::Panel::top("menu").show(ui, |ui| self.menu_bar(ui));
         egui::Panel::bottom("status").show(ui, |ui| ui.label(&self.status));
