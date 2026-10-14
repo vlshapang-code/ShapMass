@@ -17,7 +17,7 @@ it active. If there are no spectrum windows, a click or drag creates one.
 from pathlib import Path
 
 # PySide6 must be imported before pyqtgraph so pyqtgraph picks the same Qt binding.
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import QFileDialog, QMainWindow, QMessageBox
 
@@ -162,7 +162,17 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dock)
         self.docks.append(dock)
         self.set_active_dock(dock)
+        # The new dock joins Qt's layout on the next event-loop tick; even out then.
+        QTimer.singleShot(0, self._even_out_docks)
         return dock
+
+    def _even_out_docks(self):
+        """Give the docked spectrum windows equal widths, side by side."""
+        docked = [d for d in self.docks if not d.isFloating() and not d.isHidden()
+                  and self.dockWidgetArea(d) == Qt.DockWidgetArea.BottomDockWidgetArea]
+        if len(docked) > 1:
+            self.resizeDocks(docked, [self.width() // len(docked)] * len(docked),
+                             Qt.Orientation.Horizontal)
 
     def set_active_dock(self, dock):
         if self.active_dock is not None and self.active_dock is not dock:
@@ -173,6 +183,8 @@ class MainWindow(QMainWindow):
 
     def _dock_closed(self, dock):
         self.docks.remove(dock)
+        # Qt removes the closed window from the layout a moment later; re-even then.
+        QTimer.singleShot(0, self._even_out_docks)
         if dock is self.active_dock:
             self.active_dock = None
             if self.docks:  # Hand "active" to the newest remaining window
