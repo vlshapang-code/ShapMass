@@ -11,14 +11,17 @@ Spectrum plots:
     click-drag                  pan
 
 Chromatogram plot:
-    click                       pick a single scan        -> sigClicked(rt)
-    click-drag                  pick a range to average   -> sigRangeSelected(rt_start, rt_end)
+    click                       pick a single scan        -> sigClicked(rt, shift)
+    click-drag                  pick a range to average   -> sigRangeSelected(rt_start, rt_end, shift)
+    (shift is True when the Shift key was held.)
 """
 from PySide6.QtCore import QEvent, Qt, Signal
 
 import pyqtgraph as pg
 
 LEFT = Qt.MouseButton.LeftButton
+SHIFT = Qt.KeyboardModifier.ShiftModifier
+SELECTION_COLOR = (80, 140, 255)
 
 # How fast dragging on an axis zooms: each pixel of drag scales by this factor.
 # 1.01 ** 70 ≈ 2, so a 70-pixel drag doubles/halves the zoom.
@@ -92,20 +95,39 @@ class TrackpadViewBox(pg.ViewBox):
 class ChromatogramViewBox(TrackpadViewBox):
     """Like TrackpadViewBox, but click picks a scan and click-drag picks an RT range."""
 
-    sigClicked = Signal(float)              # retention time
-    sigRangeSelected = Signal(float, float)  # start, end retention time
+    sigClicked = Signal(float, bool)               # retention time, shift held
+    sigRangeSelected = Signal(float, float, bool)  # start, end retention time, shift held
 
     def __init__(self):
         super().__init__()
-        # Shaded band showing the selected averaging range.
-        self.selection = pg.LinearRegionItem(movable=False, brush=(80, 140, 255, 60))
+        # Shaded band marking an averaged range, or a line marking a single scan.
+        self.selection = pg.LinearRegionItem(
+            movable=False, brush=SELECTION_COLOR + (60,), pen=pg.mkPen(SELECTION_COLOR)
+        )
+        self.marker = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen(SELECTION_COLOR, width=2))
+        for item in (self.selection, self.marker):
+            item.hide()
+            self.addItem(item, ignoreBounds=True)  # don't let them affect auto-zoom
+
+    def show_range(self, start, end):
+        self.marker.hide()
+        self.selection.setRegion((start, end))
+        self.selection.show()
+
+    def show_marker(self, retention_time):
         self.selection.hide()
-        self.addItem(self.selection, ignoreBounds=True)
+        self.marker.setValue(retention_time)
+        self.marker.show()
+
+    def clear_selection(self):
+        self.selection.hide()
+        self.marker.hide()
 
     def mouseClickEvent(self, ev):
         if ev.button() == LEFT and not ev.double():
             ev.accept()
-            self.sigClicked.emit(self.mapSceneToView(ev.scenePos()).x())
+            shift = bool(ev.modifiers() & SHIFT)
+            self.sigClicked.emit(self.mapSceneToView(ev.scenePos()).x(), shift)
         else:
             super().mouseClickEvent(ev)
 
@@ -117,14 +139,15 @@ class ChromatogramViewBox(TrackpadViewBox):
         start = self.mapSceneToView(ev.buttonDownScenePos()).x()
         end = self.mapSceneToView(ev.scenePos()).x()
         lo, hi = sorted((start, end))
-        self.selection.setRegion((lo, hi))
-        self.selection.show()
+        self.show_range(lo, hi)
         if ev.isFinish():
-            self.sigRangeSelected.emit(lo, hi)
+            self.sigRangeSelected.emit(lo, hi, bool(ev.modifiers() & SHIFT))
 
 
 class TrackpadPlotWidget(pg.PlotWidget):
     """A PlotWidget wired up with ZoomAxis, a trackpad ViewBox and pinch-to-zoom."""
+
+    sigPressed = Signal()  # any mouse press inside the plot (used to pick the active window)
 
     def __init__(self, view_box, x_label, y_label):
         super().__init__(
@@ -134,6 +157,10 @@ class TrackpadPlotWidget(pg.PlotWidget):
         self.setLabel("bottom", x_label)
         self.setLabel("left", y_label)
         self.showGrid(x=True, y=True, alpha=0.2)
+
+    def mousePressEvent(self, ev):
+        self.sigPressed.emit()
+        super().mousePressEvent(ev)
 
     def viewportEvent(self, event):
         # macOS trackpad pinches arrive as "native gestures", not wheel events.
