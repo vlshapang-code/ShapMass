@@ -5,16 +5,18 @@ Layout:
     - Docks:  spectrum windows. Each one can be dragged around, docked to any
               edge, stacked into tabs, floated as its own window, or closed.
 
-Stage 1 is layout only; no data is read from the .raw file yet.
+Opening a .raw file draws its TIC. Spectrum windows are still empty.
 """
 from pathlib import Path
 
 # PySide6 must be imported before pyqtgraph so pyqtgraph picks the same Qt binding.
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import QDockWidget, QFileDialog, QMainWindow
+from PySide6.QtWidgets import QDockWidget, QFileDialog, QMainWindow, QMessageBox
 
 import pyqtgraph as pg
+
+from shapmass.raw_reader import RawFile
 
 # White background / black axes, like most mass spec software.
 pg.setConfigOptions(background="w", foreground="k", antialias=False)
@@ -37,11 +39,12 @@ class MainWindow(QMainWindow):
         # Allow docks to be split side-by-side within the same edge.
         self.setDockNestingEnabled(True)
 
-        self.raw_path = None      # Path of the currently open .raw file
+        self.raw = None           # The currently open RawFile (kept open for later stages)
         self.spectrum_count = 0   # Used to number new spectrum windows
 
         self.tic_plot = make_plot("Retention time (min)", "Intensity")
         self.tic_plot.setTitle("TIC")
+        self.tic_curve = self.tic_plot.plot(pen=pg.mkPen("k", width=1))
         self.setCentralWidget(self.tic_plot)
 
         self._build_menus()
@@ -77,10 +80,29 @@ class MainWindow(QMainWindow):
             self.open_file(Path(path))
 
     def open_file(self, path):
-        # Stage 1: just remember the path. Stage 2 will read the TIC from it.
-        self.raw_path = path
+        try:
+            raw = RawFile(path)
+            rt, intensity, _scans = raw.tic()
+        except Exception as err:
+            QMessageBox.critical(self, "Could not open file", str(err))
+            return
+
+        if self.raw is not None:
+            self.raw.close()
+        self.raw = raw
+
+        self.tic_curve.setData(rt, intensity)
+        self.tic_plot.autoRange()
         self.setWindowTitle(f"ShapMass — {path.name}")
-        self.statusBar().showMessage(f"Selected {path} (reading not implemented yet)")
+        self.statusBar().showMessage(
+            f"{raw.instrument_model}  |  scans {raw.first_scan}–{raw.last_scan}  |  "
+            f"RT {rt[0]:.2f}–{rt[-1]:.2f} min"
+        )
+
+    def closeEvent(self, event):
+        if self.raw is not None:
+            self.raw.close()
+        super().closeEvent(event)
 
     def add_spectrum_dock(self):
         """Add a new, empty, movable spectrum window at the bottom."""
