@@ -3,7 +3,7 @@
 All plots:
     pinch                       zoom in/out around the cursor
     two-finger scroll           pan
-    double-click                reset zoom to fit the data (TIC only; spectra zoom out a step)
+    double-click                reset zoom to fit the data (TIC and spectra)
     click-hold on an axis       drag up = zoom in on that axis, drag down = zoom out
     hover on the X axis         left/right arrows = pan the view along m/z or time
     hover on the Y axis         up/down arrows = pan the view along intensity
@@ -12,7 +12,7 @@ All plots:
 
 Spectrum plots (SpectrumViewBox):
     click                       zoom in on m/z around the click, intensity fits what is visible
-    double-click                zoom out one step (back to the full view once fully out)
+    double-click                zoom all the way out to the full spectrum
     click-drag                  zoom to the m/z range you drag across (the spectrum never pans)
 
 Chromatogram plot:
@@ -158,11 +158,10 @@ class SpectrumViewBox(TrackpadViewBox):
             super().mouseClickEvent(ev)  # right-click menu
             return
         ev.accept()
-        center = self.mapSceneToView(ev.scenePos()).x()
-        # A double-click arrives as a click (already zoomed in) then a double-click.
-        # Undo that zoom and go one step further out: 1 / factor**2.
-        factor = CLICK_ZOOM_FACTOR ** -2 if ev.double() else CLICK_ZOOM_FACTOR
-        self._zoom_x(center, factor)
+        if ev.double():
+            self.show_full_spectrum()  # (the click before it had already zoomed in; this overrides it)
+        else:
+            self._zoom_x(self.mapSceneToView(ev.scenePos()).x(), CLICK_ZOOM_FACTOR)
 
     def _data_x_range(self):
         """(min, max) m/z of everything plotted, or None.
@@ -178,18 +177,18 @@ class SpectrumViewBox(TrackpadViewBox):
                 highs.append(x.max())
         return (min(lows), max(highs)) if lows else None
 
-    def _zoom_x(self, center, factor):
-        """Scale the m/z view by factor around center; fit intensity to what is visible."""
+    def show_full_spectrum(self):
+        """Zoom all the way out to the whole spectrum, with the same margin as auto-range."""
         full = self._data_x_range()
         if full is None:
             return
+        self.setXRange(full[0], full[1], padding=None)  # None = pyqtgraph's default padding
+        self.enableAutoRange(axis=pg.ViewBox.YAxis)
+
+    def _zoom_x(self, center, factor):
+        """Scale the m/z view by factor around center; fit intensity to what is visible."""
         lo, hi = self.viewRange()[0]
-        new_lo, new_hi = center - (center - lo) * factor, center + (hi - center) * factor
-        if factor > 1 and new_lo <= full[0] and new_hi >= full[1]:
-            # Zoomed all the way out: show the whole spectrum (2% margin, like auto-range).
-            margin = 0.02 * (full[1] - full[0])
-            new_lo, new_hi = full[0] - margin, full[1] + margin
-        self.setXRange(new_lo, new_hi, padding=0)
+        self.setXRange(center - (center - lo) * factor, center + (hi - center) * factor, padding=0)
         self.enableAutoRange(axis=pg.ViewBox.YAxis)
 
 
