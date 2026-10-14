@@ -5,8 +5,8 @@ All plots:
     two-finger scroll           pan
     double-click                reset zoom to fit the data
     click-hold on an axis       drag up = zoom in on that axis, drag down = zoom out
-    hover on the Y axis         up arrow = zoom in, down arrow = zoom out
-    hover on the X axis         right arrow = zoom in, left arrow = zoom out
+    hover on the X axis         left/right arrows = pan the view along m/z or time
+    hover on the Y axis         up/down arrows = pan the view along intensity
     hover on the plot area      left/right arrow = step scans   -> sigStepRequested(step, shift)
     right-click                 pyqtgraph's menu (export, etc.)
 
@@ -31,8 +31,9 @@ SELECTION_COLOR = (80, 140, 255)
 # 1.01 ** 70 ≈ 2, so a 70-pixel drag doubles/halves the zoom.
 AXIS_ZOOM_PER_PIXEL = 1.01
 
-# Each arrow-key press zooms an axis in or out by this factor (holding the key repeats it).
-ARROW_ZOOM_STEP = 1.15
+# Each arrow-key press pans the hovered axis by this fraction of the visible range
+# (holding the key repeats it). 0.01 turns a 200-300 view into 201-301.
+ARROW_PAN_FRACTION = 0.01
 
 # A normal mouse wheel reports angles, not pixels. Pixels to pan per wheel notch.
 WHEEL_NOTCH_PIXELS = 30
@@ -67,6 +68,15 @@ class ZoomAxis(pg.AxisItem):
             # Intensity axis: keep the bottom edge fixed so the baseline stays put.
             bottom = view.viewRange()[1][0]
             view.scaleBy(y=factor, center=pg.Point(anchor.x(), bottom))
+
+    def pan(self, fraction):
+        """Slide the view along this axis by a fraction of the visible range (+ = up/right)."""
+        view = self.linkedView()
+        x_range, y_range = view.viewRange()
+        if self.orientation in ("bottom", "top"):
+            view.translateBy(x=fraction * (x_range[1] - x_range[0]))
+        else:
+            view.translateBy(y=fraction * (y_range[1] - y_range[0]))
 
     def wheelEvent(self, ev):
         ev.ignore()  # Axis zoom is drag-only; don't let scrolling over an axis zoom it.
@@ -194,22 +204,20 @@ class TrackpadPlotWidget(pg.PlotWidget):
         return None, scene_pos
 
     def keyPressEvent(self, ev):
-        """Arrow keys zoom the axis under the mouse.
+        """Arrow keys pan the axis under the mouse.
 
-        Y axis:  up = zoom in, down = zoom out  (same direction as dragging)
-        X axis:  right = zoom in, left = zoom out
+        X axis:  right = view moves toward larger values, left = smaller
+        Y axis:  up = larger values, down = smaller
+        Over the plot area itself, left/right step scans (see below).
         """
-        axis, scene_pos = self._axis_under_cursor()
+        axis, _scene_pos = self._axis_under_cursor()
         key = ev.key()
         if axis is not None:
             vertical = axis.orientation in ("left", "right")
-            zoom_in = {True: Qt.Key.Key_Up, False: Qt.Key.Key_Right}[vertical]
-            zoom_out = {True: Qt.Key.Key_Down, False: Qt.Key.Key_Left}[vertical]
-            if key in (zoom_in, zoom_out):
-                factor = 1 / ARROW_ZOOM_STEP if key == zoom_in else ARROW_ZOOM_STEP
-                # Zoom around the data value under the mouse along that axis.
-                anchor = self.getViewBox().mapSceneToView(scene_pos)
-                axis.zoom(factor, anchor)
+            increase = Qt.Key.Key_Up if vertical else Qt.Key.Key_Right
+            decrease = Qt.Key.Key_Down if vertical else Qt.Key.Key_Left
+            if key in (increase, decrease):
+                axis.pan(ARROW_PAN_FRACTION if key == increase else -ARROW_PAN_FRACTION)
                 ev.accept()
                 return
         elif key in (Qt.Key.Key_Left, Qt.Key.Key_Right):
