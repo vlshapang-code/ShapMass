@@ -10,6 +10,8 @@ Interaction (see plot_widgets.py for zoom/pan controls):
     - Click-drag on the TIC  -> average that RT range into the active spectrum window.
     - Hold Shift for either  -> put the result in a new spectrum window instead.
     - File > Add New Window  -> empty spectrum window that becomes the active one.
+    - Left/right arrows while hovering a plot -> step the active (or hovered) spectrum
+      by one scan; averages slide by one scan, Shift+arrow grows/shrinks them.
 
 The "active" window has a highlighted title bar; click inside a spectrum to make
 it active. If there are no spectrum windows, a click or drag creates one.
@@ -49,6 +51,8 @@ class MainWindow(QMainWindow):
         self.tic_view.sigRangeSelected.connect(self.average_range)
         self.tic_plot = TrackpadPlotWidget(self.tic_view, "Retention time (min)", "Intensity")
         self.tic_plot.setTitle("TIC")
+        self.tic_plot.sigStepRequested.connect(
+            lambda step, shift: self.step_scans(self.active_dock, step, shift))
         self.tic_curve = self.tic_plot.plot(pen=pg.mkPen("k", width=1))
         self.setCentralWidget(self.tic_plot)
 
@@ -118,32 +122,57 @@ class MainWindow(QMainWindow):
         if self.raw is None:
             return
         scan = self.raw.scan_number_at(retention_time)
-        mz, intensity = self.raw.spectrum(scan)
-        rt = self.raw.retention_time(scan)
-
-        dock = self._target_dock(new_window)
-        dock.show_spectrum(
-            f"Scan {scan}  ({rt:.2f} min)", mz, intensity, self.raw.scan_type(scan), (rt, rt)
-        )
-        self._update_tic_selection()
+        self._show_scans(self._target_dock(new_window), scan, scan)
 
     def average_range(self, rt_start, rt_end, new_window):
         """Average the scans between two retention times."""
         if self.raw is None:
             return
         first = self.raw.scan_number_at(rt_start)
-        last = self.raw.scan_number_at(rt_end)
+        # End on a scan of the same type as the first, so both ends are comparable.
+        last = self.raw.snap_to_type(self.raw.scan_number_at(rt_end), first)
+        self._show_scans(self._target_dock(new_window), first, last)
+
+    def step_scans(self, dock, step, extend):
+        """Left/right arrows over a plot.
+
+        Single scan:   moves to the previous/next scan of the same type.
+        Average:       slides the whole range by one scan.
+        Shift+arrow:   on an average, moves only the right edge: grows or shrinks it by one scan.
+        """
+        if self.raw is None or dock is None or dock.scans is None:
+            return
+        first, last = dock.scans
+        if extend:
+            new_first, new_last = first, max(first, self.raw.step_scan(last, step))
+            if new_last == last:
+                return
+        else:
+            new_first = self.raw.step_scan(first, step)
+            new_last = self.raw.step_scan(last, step)
+            if new_first == first or new_last == last:  # hit the start or end of the file
+                return
+        self.set_active_dock(dock)
+        self._show_scans(dock, new_first, new_last, keep_view=True)
+
+    def _show_scans(self, dock, first, last, keep_view=False):
+        """Draw scan `first` (if first == last) or the average of first..last in a dock."""
         try:
-            mz, intensity = self.raw.average(first, last)
+            if first == last:
+                mz, intensity = self.raw.spectrum(first)
+            else:
+                mz, intensity = self.raw.average(first, last)
         except Exception as err:
-            self.statusBar().showMessage(f"Averaging failed: {err}")
+            self.statusBar().showMessage(f"Could not read scans {first}–{last}: {err}")
             return
 
         start, end = self.raw.retention_time(first), self.raw.retention_time(last)
-        dock = self._target_dock(new_window)
+        if first == last:
+            title = f"Scan {first}  ({start:.2f} min)"
+        else:
+            title = f"Average scans {first}–{last}  ({start:.2f}–{end:.2f} min)"
         dock.show_spectrum(
-            f"Average {start:.2f}–{end:.2f} min", mz, intensity, self.raw.scan_type(first),
-            (start, end),
+            title, mz, intensity, self.raw.scan_type(first), (first, last), (start, end), keep_view
         )
         self._update_tic_selection()
 
@@ -159,6 +188,7 @@ class MainWindow(QMainWindow):
         dock = SpectrumDock(f"Spectrum {self.dock_count}", self)
         dock.sigActivated.connect(self.set_active_dock)
         dock.sigClosed.connect(self._dock_closed)
+        dock.sigStepRequested.connect(self.step_scans)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, dock)
         self.docks.append(dock)
         self.set_active_dock(dock)

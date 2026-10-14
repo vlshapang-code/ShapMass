@@ -7,6 +7,7 @@ All plots:
     click-hold on an axis       drag up = zoom in on that axis, drag down = zoom out
     hover on the Y axis         up arrow = zoom in, down arrow = zoom out
     hover on the X axis         right arrow = zoom in, left arrow = zoom out
+    hover on the plot area      left/right arrow = step scans   -> sigStepRequested(step, shift)
     right-click                 pyqtgraph's menu (export, etc.)
 
 Spectrum plots:
@@ -159,6 +160,7 @@ class TrackpadPlotWidget(pg.PlotWidget):
     """A PlotWidget wired up with ZoomAxis, a trackpad ViewBox and pinch-to-zoom."""
 
     sigPressed = Signal()  # any mouse press inside the plot (used to pick the active window)
+    sigStepRequested = Signal(int, bool)  # left/right arrow in the plot area: step (-1/+1), shift held
 
     def __init__(self, view_box, x_label, y_label):
         super().__init__(
@@ -208,6 +210,14 @@ class TrackpadPlotWidget(pg.PlotWidget):
                 # Zoom around the data value under the mouse along that axis.
                 anchor = self.getViewBox().mapSceneToView(scene_pos)
                 axis.zoom(factor, anchor)
+                ev.accept()
+                return
+        elif key in (Qt.Key.Key_Left, Qt.Key.Key_Right):
+            # Over the plot area itself (not an axis): step through scans.
+            cursor = self.viewport().mapFromGlobal(QCursor.pos())
+            if self.viewport().rect().contains(cursor):
+                step = 1 if key == Qt.Key.Key_Right else -1
+                self.sigStepRequested.emit(step, bool(ev.modifiers() & SHIFT))
                 ev.accept()
                 return
         super().keyPressEvent(ev)

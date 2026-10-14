@@ -59,6 +59,7 @@ class RawFile:
         self.first_scan = header.FirstSpectrum
         self.last_scan = header.LastSpectrum
         self.instrument_model = str(self._raw.GetInstrumentData().Model)
+        self._types = None  # filled in on first use by _scan_types()
 
     def tic(self):
         """Total ion chromatogram over all scans.
@@ -84,6 +85,37 @@ class RawFile:
     def scan_type(self, scan):
         """Thermo's scan description, e.g. 'FTMS + p ESI sid=20.00 Full ms [700.0000-3000.0000]'."""
         return str(self._raw.GetScanEventStringForScanNumber(scan))
+
+    def _scan_types(self):
+        """Scan type of every scan, indexed by scan - first_scan (computed once)."""
+        if self._types is None:
+            self._types = [self.scan_type(s) for s in range(self.first_scan, self.last_scan + 1)]
+        return self._types
+
+    def step_scan(self, scan, step):
+        """The scan `step` (+1 or -1) away among scans of the same type.
+
+        Methods that alternate scan types (e.g. MS1 / sid=20 / sid=50) would
+        otherwise jump between types on every step. Returns `scan` itself if
+        there is no further scan of that type.
+        """
+        types = self._scan_types()
+        wanted = types[scan - self.first_scan]
+        s = scan + step
+        while self.first_scan <= s <= self.last_scan:
+            if types[s - self.first_scan] == wanted:
+                return s
+            s += step
+        return scan
+
+    def snap_to_type(self, scan, like_scan):
+        """Nearest scan at or before `scan` with the same type as `like_scan`
+        (never earlier than like_scan)."""
+        types = self._scan_types()
+        wanted = types[like_scan - self.first_scan]
+        while scan > like_scan and types[scan - self.first_scan] != wanted:
+            scan -= 1
+        return scan
 
     def spectrum(self, scan):
         """One scan as (mz, intensity) numpy arrays (profile points if recorded in profile)."""
