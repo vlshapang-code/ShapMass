@@ -2,5 +2,14 @@
     // The Rust project lives in rust/, not the repo root.
     "rust-analyzer.linkedProjects": ["rust/Cargo.toml"],
     // Debug builds of the GUI are very slow; make the Run link build with --release.
-    "rust-analyzer.runnables.extraArgs": ["--release"]
+    "rust-analyzer.runnables.extraArgs": ["--release"],
+
+    // Code Runner: the ▷ button in the top-right of the editor. For Rust it runs the
+    // whole app (not just the open file), using the full cargo path.
+    "code-runner.executorMap": {
+        "rust": "cd \"$workspaceRoot/rust\" && \"$HOME/.cargo/bin/cargo\" run --release"
+    },
+    "code-runner.runInTerminal": true,
+    "code-runner.saveAllFilesBeforeRun": true,
+    "code-runner.clearPreviousOutput": true
 }

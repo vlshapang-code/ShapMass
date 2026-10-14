@@ -1,0 +1,30 @@
+{
+    // cargo isn't on the PATH in every terminal, so the full path is used.
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "cargo build (release)",
+            "type": "shell",
+            "command": "${userHome}/.cargo/bin/cargo",
+            "args": ["build", "--release", "--manifest-path", "${workspaceFolder}/rust/Cargo.toml"],
+            "problemMatcher": "$rustc",
+            "group": "build"
+        },
+        {
+            "label": "cargo build (debug)",
+            "type": "shell",
+            "command": "${userHome}/.cargo/bin/cargo",
+            "args": ["build", "--manifest-path", "${workspaceFolder}/rust/Cargo.toml"],
+            "problemMatcher": "$rustc",
+            "group": "build"
+        },
+        {
+            "label": "ShapMass (Rust): run",
+            "type": "shell",
+            "command": "${userHome}/.cargo/bin/cargo",
+            "args": ["run", "--release", "--manifest-path", "${workspaceFolder}/rust/Cargo.toml"],
+            "problemMatcher": "$rustc",
+            "group": { "kind": "test", "isDefault": true }
+        }
+    ]
+}

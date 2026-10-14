@@ -1,0 +1,43 @@
+{
+    // Pick one in the Run and Debug panel (Cmd+Shift+D), then press the green play button or F5.
+    // "release" starts fast; "debug" is slow (the GUI library is unoptimised) but steps best.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ShapMass (Rust) — run",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/rust/target/release/shapmass-rs",
+            "args": [],
+            "cwd": "${workspaceFolder}/rust",
+            "preLaunchTask": "cargo build (release)"
+        },
+        {
+            "name": "ShapMass (Rust) — run with NISTmAB file",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/rust/target/release/shapmass-rs",
+            "args": ["${workspaceFolder}/Raw Files/NISTmAB_QE_C_3_phase_200ng_on_column_1.raw"],
+            "cwd": "${workspaceFolder}/rust",
+            "preLaunchTask": "cargo build (release)"
+        },
+        {
+            "name": "ShapMass (Rust) — debug build",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/rust/target/debug/shapmass-rs",
+            "args": [],
+            "cwd": "${workspaceFolder}/rust",
+            "preLaunchTask": "cargo build (debug)"
+        },
+        {
+            "name": "ShapMass (Python)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal"
+        }
+    ]
+}
