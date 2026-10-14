@@ -3,15 +3,17 @@
 All plots:
     pinch                       zoom in/out around the cursor
     two-finger scroll           pan
-    double-click                reset zoom to fit the data
+    double-click                reset zoom to fit the data (TIC only; spectra zoom out a step)
     click-hold on an axis       drag up = zoom in on that axis, drag down = zoom out
     hover on the X axis         left/right arrows = pan the view along m/z or time
     hover on the Y axis         up/down arrows = pan the view along intensity
     hover on the plot area      left/right arrow = step scans   -> sigStepRequested(step, shift)
     right-click                 pyqtgraph's menu (export, etc.)
 
-Spectrum plots:
-    click-drag                  pan
+Spectrum plots (SpectrumViewBox):
+    click                       zoom in on m/z around the click, intensity fits what is visible
+    double-click                zoom out one step (back to the full view once fully out)
+    click-hold / drag           does nothing (the spectrum never moves by accident)
 
 Chromatogram plot:
     click                       pick a single scan        -> sigClicked(rt, shift)
@@ -30,6 +32,9 @@ SELECTION_COLOR = (80, 140, 255)
 # How fast dragging on an axis zooms: each pixel of drag scales by this factor.
 # 1.01 ** 70 ≈ 2, so a 70-pixel drag doubles/halves the zoom.
 AXIS_ZOOM_PER_PIXEL = 1.01
+
+# A click on a spectrum zooms the m/z axis in by this factor, centered on the click.
+CLICK_ZOOM_FACTOR = 0.5
 
 # Each arrow-key press pans the hovered axis by this fraction of the visible range
 # (holding the key repeats it). 0.01 turns a 200-300 view into 201-301.
@@ -112,6 +117,57 @@ class TrackpadViewBox(pg.ViewBox):
             super().mouseDragEvent(ev, axis)  # pan
         else:
             ev.ignore()  # disable pyqtgraph's right-drag axis stretching
+
+
+class SpectrumViewBox(TrackpadViewBox):
+    """Spectrum plot area: click to zoom in, double-click to zoom out, no drag-panning."""
+
+    def __init__(self):
+        super().__init__()
+        # When the intensity axis auto-fits, consider only data inside the current m/z view.
+        self.setAutoVisible(y=True)
+
+    def mouseDragEvent(self, ev, axis=None):
+        ev.accept()  # swallow it: holding or dragging must not move the spectrum
+
+    def mouseClickEvent(self, ev):
+        if ev.button() != LEFT:
+            super().mouseClickEvent(ev)  # right-click menu
+            return
+        ev.accept()
+        center = self.mapSceneToView(ev.scenePos()).x()
+        # A double-click arrives as a click (already zoomed in) then a double-click.
+        # Undo that zoom and go one step further out: 1 / factor**2.
+        factor = CLICK_ZOOM_FACTOR ** -2 if ev.double() else CLICK_ZOOM_FACTOR
+        self._zoom_x(center, factor)
+
+    def _data_x_range(self):
+        """(min, max) m/z of everything plotted, or None.
+
+        Read from the items' own data: childrenBounds() would only report the
+        slice currently in view, because the plot clips to the view.
+        """
+        lows, highs = [], []
+        for item in self.addedItems:
+            x = getattr(item, "xData", None)
+            if x is not None and len(x):
+                lows.append(x.min())
+                highs.append(x.max())
+        return (min(lows), max(highs)) if lows else None
+
+    def _zoom_x(self, center, factor):
+        """Scale the m/z view by factor around center; fit intensity to what is visible."""
+        full = self._data_x_range()
+        if full is None:
+            return
+        lo, hi = self.viewRange()[0]
+        new_lo, new_hi = center - (center - lo) * factor, center + (hi - center) * factor
+        if factor > 1 and new_lo <= full[0] and new_hi >= full[1]:
+            # Zoomed all the way out: show the whole spectrum (2% margin, like auto-range).
+            margin = 0.02 * (full[1] - full[0])
+            new_lo, new_hi = full[0] - margin, full[1] + margin
+        self.setXRange(new_lo, new_hi, padding=0)
+        self.enableAutoRange(axis=pg.ViewBox.YAxis)
 
 
 class ChromatogramViewBox(TrackpadViewBox):

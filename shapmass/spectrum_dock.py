@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QDockWidget
 
 import pyqtgraph as pg
 
-from shapmass.plot_widgets import TrackpadPlotWidget, TrackpadViewBox
+from shapmass.plot_widgets import SpectrumViewBox, TrackpadPlotWidget
 
 # Title bar highlight for the active window (the one plain TIC clicks update).
 ACTIVE_STYLE = "QDockWidget::title { background: rgb(190, 210, 255); }"
@@ -17,7 +17,7 @@ class SpectrumDock(QDockWidget):
 
     def __init__(self, title, parent):
         super().__init__(title, parent)
-        self.plot = TrackpadPlotWidget(TrackpadViewBox(), "m/z", "Intensity")
+        self.plot = TrackpadPlotWidget(SpectrumViewBox(), "m/z", "Intensity")
         # Profile spectra have tens of thousands of points; only draw what's
         # visible, and downsample keeping peak maxima so no peak disappears.
         self.plot.setClipToView(True)
