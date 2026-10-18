@@ -10,11 +10,8 @@
 // Release builds are GUI apps: don't open a console window alongside them.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-#[path = "rust/app.rs"]
 mod app;
-#[path = "rust/plots.rs"]
 mod plots;
-#[path = "rust/raw_reader.rs"]
 mod raw_reader;
 
 use std::path::PathBuf;

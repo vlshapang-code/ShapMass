@@ -270,6 +270,9 @@ class TrackpadPlotWidget(pg.PlotWidget):
         self.setLabel("bottom", x_label)
         self.setLabel("left", y_label)
         self.showGrid(x=True, y=True, alpha=0.2)
+        # QGraphicsView accepts drags but drops nothing; let file drops reach the main window.
+        self.setAcceptDrops(False)
+        self.viewport().setAcceptDrops(False)
 
     def mousePressEvent(self, ev):
         self.sigPressed.emit()

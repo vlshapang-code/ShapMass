@@ -9,6 +9,7 @@ Interaction (see plot_widgets.py for zoom/pan controls):
     - Click the TIC          -> show that scan in the active spectrum window.
     - Click-drag on the TIC  -> average that RT range into the active spectrum window.
     - Hold Shift for either  -> put the result in a new spectrum window instead.
+    - File > Open, or drag a .raw / .mzML file onto the window -> open it.
     - File > Add New Window  -> empty spectrum window that becomes the active one.
     - Left/right arrows while hovering a plot -> step the active (or hovered) spectrum
       by one scan; averages slide by one scan, Shift+arrow grows/shrinks them.
@@ -25,12 +26,26 @@ from PySide6.QtWidgets import QFileDialog, QMainWindow, QMessageBox
 
 import pyqtgraph as pg
 
+from .mzml_reader import MzmlFile
 from .plot_widgets import ChromatogramViewBox, TrackpadPlotWidget
-from .raw_reader import RawFile
 from .spectrum_dock import SpectrumDock
 
 # White background / black axes, like most mass spec software.
 pg.setConfigOptions(background="w", foreground="k", antialias=False)
+
+SUPPORTED_SUFFIXES = (".raw", ".mzml")
+
+
+def open_data_file(path):
+    """Open a .raw or .mzML file with the matching reader."""
+    suffix = path.suffix.lower()
+    if suffix == ".mzml":
+        return MzmlFile(path)
+    if suffix == ".raw":
+        # Imported here so mzML files still open if .NET or Thermo's DLLs are missing.
+        from .raw_reader import RawFile
+        return RawFile(path)
+    raise IOError(f"ShapMass can't open {path.name}: only .raw and .mzML files are supported")
 
 
 class MainWindow(QMainWindow):
@@ -41,7 +56,7 @@ class MainWindow(QMainWindow):
         # Allow docks to be split side-by-side within the same edge.
         self.setDockNestingEnabled(True)
 
-        self.raw = None           # The currently open RawFile
+        self.raw = None           # The currently open RawFile or MzmlFile
         self.docks = []           # Open spectrum windows, oldest first
         self.active_dock = None   # The one plain TIC clicks/drags update
         self.dock_count = 0       # Used to number new spectrum windows
@@ -57,7 +72,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.tic_plot)
 
         self._build_menus()
-        self.statusBar().showMessage("File → Open… to load a Thermo .raw file")
+        self.setAcceptDrops(True)
+        self.statusBar().showMessage("File → Open… or drag in a .raw or .mzML file")
 
     def _build_menus(self):
         file_menu = self.menuBar().addMenu("&File")
@@ -82,14 +98,39 @@ class MainWindow(QMainWindow):
 
     def open_file_dialog(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Open Thermo RAW file", "", "Thermo RAW files (*.raw);;All files (*)"
+            self, "Open mass spec file", "",
+            "Mass spec files (*.raw *.mzML);;Thermo RAW files (*.raw);;mzML files (*.mzML);;"
+            "All files (*)"
         )
         if path:  # Empty string means the user cancelled
             self.open_file(Path(path))
 
+    def _dragged_file(self, event):
+        """The first .raw/.mzML file being dragged, or None."""
+        for url in event.mimeData().urls():
+            if url.isLocalFile():
+                path = Path(url.toLocalFile())
+                if path.suffix.lower() in SUPPORTED_SUFFIXES:
+                    return path
+        return None
+
+    def dragEnterEvent(self, event):
+        if self._dragged_file(event) is not None:
+            event.acceptProposedAction()
+
+    def dragMoveEvent(self, event):
+        if self._dragged_file(event) is not None:
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        path = self._dragged_file(event)
+        if path is not None:
+            event.acceptProposedAction()
+            self.open_file(path)
+
     def open_file(self, path):
         try:
-            raw = RawFile(path)
+            raw = open_data_file(path)
             rt, intensity, _scans = raw.tic()
         except Exception as err:
             QMessageBox.critical(self, "Could not open file", str(err))
@@ -111,6 +152,9 @@ class MainWindow(QMainWindow):
             f"{raw.instrument_model}  |  scans {raw.first_scan}–{raw.last_scan}  |  "
             f"RT {rt[0]:.2f}–{rt[-1]:.2f} min"
         )
+        # A one-point TIC has nothing to click, e.g. an exported pre-averaged spectrum.
+        if raw.first_scan == raw.last_scan:
+            self._show_scans(self.new_spectrum_dock(), raw.first_scan, raw.first_scan)
 
     def closeEvent(self, event):
         if self.raw is not None:
