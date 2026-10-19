@@ -3,7 +3,7 @@
 All plots:
     pinch                       zoom in/out around the cursor
     two-finger scroll           pan
-    double-click                reset zoom to fit the data (TIC and spectra)
+    double-click                zoom all the way out (all the data, intensity from zero)
     click-hold on an axis       drag up = zoom in on that axis, drag down = zoom out
     hover on the X axis         left/right arrows = pan the view along m/z or time
     hover on the Y axis         up/down arrows = pan the view along intensity
@@ -12,8 +12,11 @@ All plots:
 
 Spectrum plots (SpectrumViewBox):
     click                       zoom in on m/z around the click, intensity fits what is visible
-    double-click                zoom all the way out to the full spectrum
     click-drag                  zoom to the m/z range you drag across (the spectrum never pans)
+
+Whenever the view is fitted (clicks, drags, double-click, new data) intensity runs
+from just below zero to just above the tallest peak in view, so peaks always rise
+from the bottom of the plot.
 
 Chromatogram plot:
     click                       pick a single scan        -> sigClicked(rt, shift)
@@ -22,7 +25,9 @@ Chromatogram plot:
 """
 from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtGui import QCursor
+from PySide6.QtWidgets import QHBoxLayout, QToolButton, QVBoxLayout, QWidget
 
+import numpy as np
 import pyqtgraph as pg
 
 LEFT = Qt.MouseButton.LeftButton
@@ -42,6 +47,22 @@ ARROW_PAN_FRACTION = 0.01
 
 # A normal mouse wheel reports angles, not pixels. Pixels to pan per wheel notch.
 WHEEL_NOTCH_PIXELS = 30
+
+# Drags narrower than this (pixels) are ignored as accidental.
+MIN_DRAG_PIXELS = 4
+
+# Fitted views: intensity runs from -3% to +5% of the tallest peak in view, and
+# "zoom all the way out" adds this fraction of the data's width on each side.
+Y_BELOW_ZERO = 0.03
+Y_ABOVE_TOP = 0.05
+FULL_VIEW_MARGIN = 0.04
+
+
+def make_band():
+    """A shaded vertical band (a range on the x axis), hidden until used."""
+    band = pg.LinearRegionItem(movable=False, brush=SELECTION_COLOR + (60,), pen=pg.mkPen(SELECTION_COLOR))
+    band.hide()
+    return band
 
 
 class ZoomAxis(pg.AxisItem):
@@ -108,7 +129,7 @@ class TrackpadViewBox(pg.ViewBox):
     def mouseClickEvent(self, ev):
         if ev.button() == LEFT and ev.double():
             ev.accept()
-            self.autoRange()
+            self.show_all()
         else:
             super().mouseClickEvent(ev)  # right-click menu
 
@@ -117,6 +138,43 @@ class TrackpadViewBox(pg.ViewBox):
             super().mouseDragEvent(ev, axis)  # pan
         else:
             ev.ignore()  # disable pyqtgraph's right-drag axis stretching
+
+    def _data(self):
+        """(x, y) arrays of the plotted curve, or None.
+
+        Read from the item's own data: childrenBounds() would only report the
+        slice currently in view, because spectra clip to the view.
+        """
+        for item in self.addedItems:
+            x = getattr(item, "xData", None)
+            if x is not None and len(x):
+                return x, item.yData
+        return None
+
+    def fit_y(self, lo, hi, margin=0.0):
+        """Show x from lo to hi (plus margin on each side), intensity fitted to the data in lo..hi."""
+        data = self._data()
+        if data is None:
+            return
+        x, y = data
+        start, end = np.searchsorted(x, lo, "left"), np.searchsorted(x, hi, "right")
+        top = y[start:end].max(initial=0.0)
+        if top <= 0:
+            top = 1.0
+        self.setRange(xRange=(lo - margin, hi + margin),
+                      yRange=(-Y_BELOW_ZERO * top, (1 + Y_ABOVE_TOP) * top), padding=0)
+
+    def refit_y(self):
+        """Keep the current x view but re-fit intensity to the (new) data in it."""
+        self.fit_y(*self.viewRange()[0])
+
+    def show_all(self):
+        """Zoom all the way out: all the data with a small margin, intensity from zero."""
+        data = self._data()
+        if data is None:
+            return
+        lo, hi = data[0][0], data[0][-1]
+        self.fit_y(lo, hi, margin=FULL_VIEW_MARGIN * max(hi - lo, np.finfo(float).eps))
 
 
 class SpectrumViewBox(TrackpadViewBox):
@@ -127,13 +185,8 @@ class SpectrumViewBox(TrackpadViewBox):
 
     def __init__(self):
         super().__init__()
-        # When the intensity axis auto-fits, consider only data inside the current m/z view.
-        self.setAutoVisible(y=True)
         # Shaded band shown while dragging out a range to zoom to.
-        self.zoom_band = pg.LinearRegionItem(
-            movable=False, brush=SELECTION_COLOR + (60,), pen=pg.mkPen(SELECTION_COLOR)
-        )
-        self.zoom_band.hide()
+        self.zoom_band = make_band()
         self.addItem(self.zoom_band, ignoreBounds=True)
 
     def mouseDragEvent(self, ev, axis=None):
@@ -149,9 +202,8 @@ class SpectrumViewBox(TrackpadViewBox):
             self.zoom_band.show()
             return
         self.zoom_band.hide()
-        if hi - lo > 4 * self.viewPixelSize()[0]:  # ignore accidental tiny drags
-            self.setXRange(lo, hi, padding=0)
-            self.enableAutoRange(axis=pg.ViewBox.YAxis)
+        if hi - lo > MIN_DRAG_PIXELS * self.viewPixelSize()[0]:
+            self.fit_y(lo, hi)
 
     def mouseClickEvent(self, ev):
         if ev.button() != LEFT:
@@ -159,37 +211,14 @@ class SpectrumViewBox(TrackpadViewBox):
             return
         ev.accept()
         if ev.double():
-            self.show_full_spectrum()  # (the click before it had already zoomed in; this overrides it)
+            self.show_all()  # (the click before it had already zoomed in; this overrides it)
         else:
             self._zoom_x(self.mapSceneToView(ev.scenePos()).x(), CLICK_ZOOM_FACTOR)
-
-    def _data_x_range(self):
-        """(min, max) m/z of everything plotted, or None.
-
-        Read from the items' own data: childrenBounds() would only report the
-        slice currently in view, because the plot clips to the view.
-        """
-        lows, highs = [], []
-        for item in self.addedItems:
-            x = getattr(item, "xData", None)
-            if x is not None and len(x):
-                lows.append(x.min())
-                highs.append(x.max())
-        return (min(lows), max(highs)) if lows else None
-
-    def show_full_spectrum(self):
-        """Zoom all the way out to the whole spectrum, with the same margin as auto-range."""
-        full = self._data_x_range()
-        if full is None:
-            return
-        self.setXRange(full[0], full[1], padding=None)  # None = pyqtgraph's default padding
-        self.enableAutoRange(axis=pg.ViewBox.YAxis)
 
     def _zoom_x(self, center, factor):
         """Scale the m/z view by factor around center; fit intensity to what is visible."""
         lo, hi = self.viewRange()[0]
-        self.setXRange(center - (center - lo) * factor, center + (hi - center) * factor, padding=0)
-        self.enableAutoRange(axis=pg.ViewBox.YAxis)
+        self.fit_y(center - (center - lo) * factor, center + (hi - center) * factor)
 
 
 class ChromatogramViewBox(TrackpadViewBox):
@@ -201,27 +230,26 @@ class ChromatogramViewBox(TrackpadViewBox):
     def __init__(self):
         super().__init__()
         # Shaded band marking an averaged range, or a line marking a single scan.
-        self.selection = pg.LinearRegionItem(
-            movable=False, brush=SELECTION_COLOR + (60,), pen=pg.mkPen(SELECTION_COLOR)
-        )
+        self.selection = make_band()
         self.marker = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen(SELECTION_COLOR, width=2))
+        self.marker.hide()
         for item in (self.selection, self.marker):
-            item.hide()
             self.addItem(item, ignoreBounds=True)  # don't let them affect auto-zoom
+        self.marked = None  # the (start, end) RT range last passed to mark()
 
-    def show_range(self, start, end):
-        self.marker.hide()
-        self.selection.setRegion((start, end))
-        self.selection.show()
+    def mark(self, rt_range):
+        """Mark an RT range: a band for an average, a line for a single scan (start == end), or nothing (None)."""
+        self.marked = rt_range
+        self._draw(rt_range)
 
-    def show_marker(self, retention_time):
-        self.selection.hide()
-        self.marker.setValue(retention_time)
-        self.marker.show()
-
-    def clear_selection(self):
-        self.selection.hide()
-        self.marker.hide()
+    def _draw(self, rt_range):
+        single = rt_range is not None and rt_range[0] == rt_range[1]
+        self.selection.setVisible(rt_range is not None and not single)
+        self.marker.setVisible(single)
+        if single:
+            self.marker.setValue(rt_range[0])
+        elif rt_range is not None:
+            self.selection.setRegion(rt_range)
 
     def mouseClickEvent(self, ev):
         if ev.button() == LEFT and not ev.double():
@@ -239,8 +267,11 @@ class ChromatogramViewBox(TrackpadViewBox):
         start = self.mapSceneToView(ev.buttonDownScenePos()).x()
         end = self.mapSceneToView(ev.scenePos()).x()
         lo, hi = sorted((start, end))
-        self.show_range(lo, hi)
-        if ev.isFinish():
+        if not ev.isFinish():
+            self._draw((lo, hi))
+            return
+        self._draw(self.marked)  # whoever handles the signal marks the new range
+        if hi - lo > MIN_DRAG_PIXELS * self.viewPixelSize()[0]:  # ignore accidental tiny drags
             self.sigRangeSelected.emit(lo, hi, bool(ev.modifiers() & SHIFT))
 
 
@@ -258,6 +289,8 @@ class TrackpadPlotWidget(pg.PlotWidget):
         self.setLabel("bottom", x_label)
         self.setLabel("left", y_label)
         self.showGrid(x=True, y=True, alpha=0.2)
+        # Let file drops fall through to the main window.
+        self.setAcceptDrops(False)
 
     def mousePressEvent(self, ev):
         self.sigPressed.emit()
@@ -322,6 +355,44 @@ class TrackpadPlotWidget(pg.PlotWidget):
                     view.scaleBy(s=(factor, factor), center=view.mapSceneToView(scene_pos))
                 return True
             if gesture == Qt.NativeGestureType.SmartZoomNativeGesture:
-                view.autoRange()  # two-finger double-tap
+                view.show_all()  # two-finger double-tap
                 return True
         return super().viewportEvent(event)
+
+
+# Pane controls: (symbol on the button, tooltip). Not wired up yet.
+CONTROLS = [
+    ("⧉", "Duplicate"),
+    ("⊘", "Hide"),
+    ("◉", "Hide all others"),
+    ("⊟", "Background subtract"),
+    ("🔗", "Link"),
+    ("◪", "Overlay"),
+]
+
+# Button bar matches the plot's white background, even in dark mode.
+BUTTON_BAR_STYLE = "QWidget#buttonBar { background: white; } QToolButton { color: black; font-size: 16px; }"
+
+
+def with_controls(plot):
+    """Wrap a plot in a widget with a row of symbol buttons above it (TIC and spectrum panes)."""
+    buttons = QHBoxLayout()
+    buttons.setContentsMargins(4, 2, 4, 0)
+    buttons.setSpacing(2)
+    for symbol, tooltip in CONTROLS:
+        button = QToolButton()
+        button.setText(symbol)
+        button.setToolTip(tooltip)
+        button.setAutoRaise(True)
+        buttons.addWidget(button)
+    buttons.addStretch()
+
+    body = QWidget()
+    body.setObjectName("buttonBar")
+    body.setStyleSheet(BUTTON_BAR_STYLE)
+    layout = QVBoxLayout(body)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(0)
+    layout.addLayout(buttons)
+    layout.addWidget(plot)
+    return body

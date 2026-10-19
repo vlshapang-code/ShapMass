@@ -4,11 +4,10 @@ from PySide6.QtWidgets import QDockWidget
 
 import pyqtgraph as pg
 
-from .plot_widgets import SpectrumViewBox, TrackpadPlotWidget
+from .plot_widgets import SpectrumViewBox, TrackpadPlotWidget, with_controls
 
 # Title bar highlight for the active window (the one plain TIC clicks update).
 ACTIVE_STYLE = "QDockWidget::title { background: rgb(190, 210, 255); }"
-
 
 class SpectrumDock(QDockWidget):
     sigActivated = Signal(object)  # emits self when the user clicks inside the plot
@@ -17,14 +16,16 @@ class SpectrumDock(QDockWidget):
 
     def __init__(self, title, parent):
         super().__init__(title, parent)
-        self.plot = TrackpadPlotWidget(SpectrumViewBox(), "m/z", "Intensity")
+        self.view = SpectrumViewBox()
+        self.plot = TrackpadPlotWidget(self.view, "m/z", "Intensity")
         # Profile spectra have tens of thousands of points; only draw what's
         # visible, and downsample keeping peak maxima so no peak disappears.
         self.plot.setClipToView(True)
         self.plot.setDownsampling(auto=True, mode="peak")
         self.plot.sigPressed.connect(lambda: self.sigActivated.emit(self))
         self.plot.sigStepRequested.connect(lambda step, shift: self.sigStepRequested.emit(self, step, shift))
-        self.setWidget(self.plot)
+
+        self.setWidget(with_controls(self.plot))
         # Docks only hide when closed by default; free the memory instead.
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
 
@@ -32,17 +33,20 @@ class SpectrumDock(QDockWidget):
         # range. first == last for a single scan.
         self.scans = None
         self.rt_range = None
+        self.source = None  # The open file this window's spectra come from
 
     def show_spectrum(self, title, mz, intensity, scan_type, scans, rt_range, keep_view=False):
-        """Draw a spectrum. keep_view=True leaves the current zoom alone (used when stepping)."""
+        """Draw a spectrum. keep_view=True keeps the m/z zoom and only re-fits intensity (used when stepping)."""
         self.setWindowTitle(title)
         self.scans = scans
         self.rt_range = rt_range
         self.plot.clear()
         self.plot.plot(mz, intensity, pen=pg.mkPen("k", width=1))
         self.plot.setTitle(scan_type, size="9pt")
-        if not keep_view:
-            self.plot.autoRange()
+        if keep_view:
+            self.view.refit_y()
+        else:
+            self.view.show_all()
 
     def set_active(self, active):
         self.setStyleSheet(ACTIVE_STYLE if active else "")

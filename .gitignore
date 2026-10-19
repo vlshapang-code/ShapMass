@@ -230,7 +230,7 @@ vendor/thermo/
 
 # Instrument data and reference papers: large and/or not ours to share.
 Raw Files/
-Community Context/
+_local/
 *.raw
 *.meth
 
