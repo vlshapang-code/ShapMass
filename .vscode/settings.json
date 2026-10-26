@@ -9,14 +9,22 @@
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/python.exe",
     // New Windows terminals (and so the Code Runner ▷ button) get .venv first on PATH, so plain `python` is the venv.
     "terminal.integrated.env.windows": {
-        "PATH": "${workspaceFolder}\\.venv;${workspaceFolder}\\.venv\\Scripts;${env:PATH}"
+        "PATH": "${workspaceFolder}\\.venv;${workspaceFolder}\\.venv\\Scripts;${env:USERPROFILE}\\.cargo\\bin;${env:PATH}"
+    },
+    // New Mac terminals get cargo on PATH, so the Code Runner command below can call plain `cargo`.
+    "terminal.integrated.env.osx": {
+        "PATH": "${env:HOME}/.cargo/bin:${env:PATH}"
     },
 
-    // Code Runner: the ▷ button in the top-right of the editor. For Rust it runs the
-    // whole app the open file belongs to (from main.rs it steps into rust/ to find Cargo.toml).
-    // This command is written for the Mac shell; on Windows use the "Windows:" tasks instead.
+    // Code Runner: the ▷ button in the top-right of the editor. For Rust it runs the whole app the
+    // open file belongs to. The command must parse in both zsh (Mac) and PowerShell 5.1 (Windows):
+    // Code Runner turns `&&` into `; if ($?) { ... }` for PowerShell, but bash-only syntax like
+    // `[ -f ... ] || ...` breaks it. ($dir is already quoted by Code Runner.)
+    // `cd rust` steps from mac/main.rs into mac/rust/; where there is no rust/ subfolder
+    // (e.g. windows/rust/main.rs) it prints a harmless error and cargo runs from $dir.
+    // (executorMapByGlob can't split mac/ from windows/: it matches only the file name, not the path.)
     "code-runner.executorMap": {
-        "rust": "cd \"$dir\" && { [ -f Cargo.toml ] || cd rust; } && \"$HOME/.cargo/bin/cargo\" run --release"
+        "rust": "cd $dir && cd rust; cargo run --release"
     },
     "code-runner.runInTerminal": true,
     "code-runner.saveAllFilesBeforeRun": true,

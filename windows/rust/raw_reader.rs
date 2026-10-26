@@ -26,6 +26,12 @@ pub struct RawFile {
 
 impl RawFile {
     pub fn open(path: &Path) -> io::Result<Self> {
+        // The reader asks for .NET 8, but this PC may only have a newer runtime
+        // (e.g. .NET 10). Let it run there; .NET reads this when it first starts.
+        if std::env::var_os("DOTNET_ROLL_FORWARD").is_none() {
+            // SAFETY: always safe on Windows, where the OS serializes environment access.
+            unsafe { std::env::set_var("DOTNET_ROLL_FORWARD", "Major") };
+        }
         let mut reader = RawFileReader::open(path)?;
         let instrument_model = reader.instrument_model().model().unwrap_or("unknown").to_string();
 

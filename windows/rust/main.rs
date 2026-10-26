@@ -4,8 +4,9 @@
 //!     cargo run --release
 //!     cargo run --release -- "..\..\Raw Files\some_file.raw"     (open a file right away)
 //!
-//! Thermo's reader runs on .NET 8. The usual system-wide install
-//! (C:\Program Files\dotnet) is found automatically; set DOTNET_ROOT to use another.
+//! Thermo's reader runs on .NET 8, or a newer .NET if 8 isn't installed (see raw_reader.rs).
+//! The usual system-wide install (C:\Program Files\dotnet) is found automatically;
+//! set DOTNET_ROOT to use another.
 
 // Release builds are GUI apps: don't open a console window alongside them.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
